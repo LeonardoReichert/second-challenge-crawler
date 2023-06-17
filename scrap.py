@@ -17,12 +17,8 @@ import time;
 
 class Scrap(Browser):
 
-    def searchByMark(self, num_mark):
-        """
-        Busca, obtiene mediante Requests y por marcas lo necesario
-        """
-
-        url = "/Marca/BuscarMarca.aspx";
+    def findFormFirstHashes(self, url):
+        """ Primer paso, visitar link """
         
         html = self.get(url);
         if html == -1:
@@ -42,17 +38,39 @@ class Scrap(Browser):
         hashes = hashes[0];
         
         #a este punto no hay faltantes en el form (no es una variante)
+
+        return hashes;
+
+    def searchByMark(self, num_mark):
+        """
+        Busca, obtiene mediante Requests y por marcas lo necesario
+        """
+        url = self.hostname+"/Marca/BuscarMarca.aspx";
+
+        hashes = self.findFormFirstHashes();
+        if hashes == -1:
+            print("Fallo la primer visita")
+            return -1;
         
         data = {"LastNumSol":0,
                 "Hash":hashes[0], "IDW":hashes[1], "responseCaptcha":"",
                 "param1":num_mark,"param17":"1"};
         data |= {f"param{n}":"" for n in range(2,17)}; #<-llenamos de datos iguales
         
+        #primera valor poner numero en textinput:
         resp = self.post(url+"/FindMarcas",json=data,headers={"Content-Type":"application/json"});
         if resp == -1:
             print("No se ha podido hacer efectivamente el POST.");
             return -1;
         resp = json.loads(resp);
+        if not "d" in resp or "ErrorMessage" in resp["d"]:
+            print("Error json");
+            return 0;
+
+#        if len(resp) > 1:
+ #           print(" SON MAS?")
+  #          input("PAUSA")
+
         print(resp)
 
         data2 = {"IDW": hashes[1], "Hash": json.loads(resp["d"])["Hash"],
@@ -69,11 +87,15 @@ class Scrap(Browser):
 
 
 hostname = open("target_site.txt", "r").read().strip(); #localhost:443
-num = open("regs.txt", "r").read().strip(); #123
+args = open("regs.txt", "r").read().strip(); #123
 
 
 b = Scrap(hostname);
-print(b.searchByMark(num)); #123
+
+for n in args.splitlines():
+    print(b.searchByMark(n)); #123
+    break;
 b.close();
+
 
 
