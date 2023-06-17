@@ -7,15 +7,44 @@ Aqui se desarrolla las acciones del desafio, scrap
 
 
 
-from browser import Browser;
-
 import re;
 import json;
 import time;
+from threading import Thread;
+
+#own modules:
+from config import config;
+from browser import Browser;
 
 
 
-class Scrap(Browser):
+class PoolThreads:
+    def __init__(self, maxthreads):
+        self.maxThreads = maxthreads;
+        self.activeThreads = [];
+
+    def waitThreads(self, wait_all=False):
+        """ Espera mientras la cantidad de threads este al limite o espera todos """
+        while (len(self.activeThreads) >= self.maxThreads) or (wait_all and self.activeThreads):
+            for thread in self.activeThreads:
+                if not thread.is_alive():
+                    self.activeThreads.remove(thread);
+            time.sleep(0.01); #10ms no estresa cpu
+
+    def startNewThread(self, func, *args):
+        """ Inicia un thread y lo pone en la lista de threads, pero espera si la lista esta en tope """
+        self.waitThreads();
+        thread = Thread(target=func, args=args);
+        thread.start();
+        self.activeThreads.append(thread);
+    
+
+
+class Scrap(Browser, PoolThreads):
+
+    def __init__(self, hostname, maxthreads = config["max_threads"]):
+        super().__init__(hostname);
+        PoolThreads.__init__(self, maxthreads);
 
     def findFormFirstHashes(self, url):
         """ Primer paso, visitar link """
@@ -41,49 +70,66 @@ class Scrap(Browser):
 
         return hashes;
 
-    def searchByMark(self, num_mark):
+    def searchByMark(self, num_marks):
         """
         Busca, obtiene mediante Requests y por marcas lo necesario
         """
-        url = self.hostname+"/Marca/BuscarMarca.aspx";
-
-        hashes = self.findFormFirstHashes();
+        
+        url = "/Marca/BuscarMarca.aspx";
+        hashes = self.findFormFirstHashes(url);
         if hashes == -1:
             print("Fallo la primer visita")
             return -1;
-        
-        data = {"LastNumSol":0,
-                "Hash":hashes[0], "IDW":hashes[1], "responseCaptcha":"",
-                "param1":num_mark,"param17":"1"};
-        data |= {f"param{n}":"" for n in range(2,17)}; #<-llenamos de datos iguales
-        
-        #primera valor poner numero en textinput:
-        resp = self.post(url+"/FindMarcas",json=data,headers={"Content-Type":"application/json"});
-        if resp == -1:
-            print("No se ha podido hacer efectivamente el POST.");
-            return -1;
-        resp = json.loads(resp);
-        if not "d" in resp or "ErrorMessage" in resp["d"]:
-            print("Error json");
-            return 0;
 
-#        if len(resp) > 1:
- #           print(" SON MAS?")
-  #          input("PAUSA")
+        lastHash = hashes[0];
+        idw = hashes[1];
+        #nota, pensar en cada cuanto renovar un hash
 
-        print(resp)
+        def workThread(nmarks):
+            """ El thread que se encargara de un num de consultas """
+            
+            for num in nmarks:
+                
+                data = {"LastNumSol":0,
+                        "Hash":lastHash, "IDW":idw, "responseCaptcha":"",
+                        "param1":num,"param17":"1"};
+                data |= {f"param{n}":"" for n in range(2,17)}; #<-llenamos de datos iguales
+                
+                #primera valor poner numero en textinput:
+                resp = self.post(url+"/FindMarcas",json=data,
+                        headers={"Content-Type":"application/json"});
+                if resp == -1:
+                    print("No se ha podido hacer efectivamente el POST.");
+                    return -1;
+                resp = json.loads(resp);
+                if not "d" in resp or "ErrorMessage" in resp["d"]:
+                    print("Error json");
+                    return 0;
+            
+                lastHash2 = json.loads(resp["d"])["Hash"];
 
-        data2 = {"IDW": hashes[1], "Hash": json.loads(resp["d"])["Hash"],
-                    "numeroSolicitud": str(num_mark)};
+        #        if len(resp) > 1:
+        #           print(" SON MAS?")
+        #          input("PAUSA")
 
-        print("\n\n")
+                print(resp)
+
+                data2 = {"IDW": idw, "Hash": lastHash2,
+                            "numeroSolicitud": str(num)};
+
+                print("\n\n")
+                
+                #tocar en la lista de resultados:
+                resp2 = self.post(url+"/FindMarcaByNumeroSolicitud",
+                                json=data2, headers={"Content-Type": "application/json"});
+                
+                resp2 = json.loads(resp2);
+                print(resp2)
+
+        #probando una ejecucion:
         
-        #tocar en la lista de resultados:
-        resp2 = self.post(url+"/FindMarcaByNumeroSolicitud",
-                         json=data2, headers={"Content-Type": "application/json"});
-        
-        resp2 = json.loads(resp2);
-        print(resp2)
+        self.startNewThread(workThread, num_marks);
+
 
 
 hostname = open("target_site.txt", "r").read().strip(); #localhost:443
@@ -92,9 +138,8 @@ args = open("regs.txt", "r").read().strip(); #123
 
 b = Scrap(hostname);
 
-for n in args.splitlines():
-    print(b.searchByMark(n)); #123
-    break;
+print(b.searchByMark( args.splitlines() )); #123
+
 b.close();
 
 
