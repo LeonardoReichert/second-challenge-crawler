@@ -10,17 +10,19 @@ from requests import Session;
 
 from urllib.robotparser import RobotFileParser;
 import time;
+from config import config;
 
 
 class Browser(Session):
-    def __init__(self, hostname):
+    def __init__(self, hostname, proxy):
         super().__init__();
-        self.headers["User-Agent"] = "Cr"
+        self.headers["User-Agent"] = config["user_agent"];
         self.hostname = hostname;
+        self.proxies = proxy;
 
         self.robotParser = RobotFileParser(url=self.hostname+"/robots.txt");
         self.robotParser.read();
-    
+        
     def rbCanFetch(self, url):
         """ Revisa los permisos del archivo /robots.txt del sitio para una url """
         return self.robotParser.can_fetch(useragent=self.headers["User-Agent"], url=url);
@@ -62,9 +64,5 @@ class Browser(Session):
                 time.sleep(5);
         
         return -1;
-
-
-
-
 
 

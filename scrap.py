@@ -10,46 +10,32 @@ Aqui se desarrolla las acciones del desafio, scrap
 import re;
 import json;
 import time;
+import itertools;
 from threading import Thread;
 
 #own modules:
 from config import config;
 from browser import Browser;
+from pool_threads import PoolThreads;
 
 
 
-class PoolThreads:
-    def __init__(self, maxthreads):
-        self.maxThreads = maxthreads;
-        self.activeThreads = [];
 
-    def waitThreads(self, wait_all=False):
-        """ Espera mientras la cantidad de threads este al limite o espera todos """
-        while (len(self.activeThreads) >= self.maxThreads) or (wait_all and self.activeThreads):
-            for thread in self.activeThreads:
-                if not thread.is_alive():
-                    self.activeThreads.remove(thread);
-            time.sleep(0.01); #10ms no estresa cpu
+class Scrap:
 
-    def startNewThread(self, func, *args):
-        """ Inicia un thread y lo pone en la lista de threads, pero espera si la lista esta en tope """
-        self.waitThreads();
-        thread = Thread(target=func, args=args);
-        thread.start();
-        self.activeThreads.append(thread);
+    def __init__(self, hostname,
+                 concurrent_proxies = config["proxies"],
+                 ):
+
+        self.hostname = hostname;
+        self.connThreads = PoolThreads(len(concurrent_proxies));
+        self.concurrentProxies = concurrent_proxies;
+        
     
-
-
-class Scrap(Browser, PoolThreads):
-
-    def __init__(self, hostname, maxthreads = config["max_threads"]):
-        super().__init__(hostname);
-        PoolThreads.__init__(self, maxthreads);
-
-    def findFormFirstHashes(self, url):
+    def findFormFirstHashes(self, browser, url):
         """ Primer paso, visitar link """
         
-        html = self.get(url);
+        html = browser.get(url);
         if html == -1:
             return -1;
 
@@ -62,85 +48,124 @@ class Scrap(Browser, PoolThreads):
         if not (hashes and form and hasTx):
             print("Faltan partes en el form")
             return -1;
-    
-        form = form[0];
+
         hashes = hashes[0];
         
-        #a este punto no hay faltantes en el form (no es una variante)
-
+        #a este punto no hay faltantes en el form (esto no es una variante)
         return hashes;
+
 
     def searchByMark(self, num_marks):
         """
         Busca, obtiene mediante Requests y por marcas lo necesario
         """
+
+        #bien los parametros antes de comenzar:
+        if not type(num_marks) in (list, tuple):
+            raise Exception("Error-num_marks is not a tuple or list")
+
+        #guardamos los proxies que fallan:
+        failedProxies = [];
+        numsCompleted = [];
+        result = [];
+
+
+        def _connectionThreadProxy(nmarks, use_proxy):
+            """ Conexion, proxy y thread que se encarga de una porcion de numeros solicitados """
+
+            url = "/Marca/BuscarMarca.aspx";
         
-        url = "/Marca/BuscarMarca.aspx";
-        hashes = self.findFormFirstHashes(url);
-        if hashes == -1:
-            print("Fallo la primer visita")
-            return -1;
+            #conexion con o sin proxy, independiente del resto:
+            browser = Browser(self.hostname, use_proxy);
 
-        lastHash = hashes[0];
-        idw = hashes[1];
-        #nota, pensar en cada cuanto renovar un hash
-
-        def workThread(nmarks):
-            """ El thread que se encargara de un num de consultas """
-            
-            for num in nmarks:
+            #visitamos la pagina, lo primero:
+            hashes = self.findFormFirstHashes(browser, url);
+            if hashes == -1:
+                print("Fallo la primer visita")
+                failedProxies.append(use_proxy);
+                return -1;
                 
+            lastHash, idw = hashes;
+
+            for num in nmarks:
+
+                #esperar un poco por consulta?:
+                if num: time.sleep(config["wait_seconds_by_query"]);
+                
+                #preparar 1ra solicitud:
                 data = {"LastNumSol":0,
                         "Hash":lastHash, "IDW":idw, "responseCaptcha":"",
                         "param1":num,"param17":"1"};
-                data |= {f"param{n}":"" for n in range(2,17)}; #<-llenamos de datos iguales
+                #llenamos de datos iguales:
+                data |= {f"param{n}":"" for n in range(2,17)};
                 
                 #primera valor poner numero en textinput:
-                resp = self.post(url+"/FindMarcas",json=data,
+                resp = browser.post(url+"/FindMarcas",json=data,
                         headers={"Content-Type":"application/json"});
                 if resp == -1:
                     print("No se ha podido hacer efectivamente el POST.");
                     return -1;
                 resp = json.loads(resp);
                 if not "d" in resp or "ErrorMessage" in resp["d"]:
-                    print("Error json");
+                    print("Error json1", json.loads(resp["d"])["ErrorMessage"]);
                     return 0;
-            
+                
                 lastHash2 = json.loads(resp["d"])["Hash"];
 
-        #        if len(resp) > 1:
-        #           print(" SON MAS?")
-        #          input("PAUSA")
-
-                print(resp)
-
+                #print("resp1",resp)
+                #preparamos segunda solicitud:
                 data2 = {"IDW": idw, "Hash": lastHash2,
                             "numeroSolicitud": str(num)};
 
                 print("\n\n")
                 
-                #tocar en la lista de resultados:
-                resp2 = self.post(url+"/FindMarcaByNumeroSolicitud",
+                #segunda solicitud, tocar en la lista de resultados:
+                resp2 = browser.post(url+"/FindMarcaByNumeroSolicitud",
                                 json=data2, headers={"Content-Type": "application/json"});
                 
                 resp2 = json.loads(resp2);
-                print(resp2)
-
-        #probando una ejecucion:
+                #{'d': '{"ErrorMessage":"Información:\\n\\n Lo sentimos, ha excedido el límite de consultas. Vuelva a intentarlo más tarde."}'}
+                if not "d" in resp2 or "ErrorMessage" in resp2["d"]:
+                    print("Error json2", json.loads(resp2["d"])["ErrorMessage"]);
+                    #posiblemente el proxy dado esta fallando:
+                    failedProxies.append(use_proxy);
+                    return 0;
+                
+                #print("resp2",resp2);
+                print("-resultado");
         
-        self.startNewThread(workThread, num_marks);
+        # se usara los proxies de manera ciclica
+        # para (a,b,c) tomar a>b>c>a>b>c
+        proxiesCycle = itertools.cycle(self.concurrentProxies);
+
+        maxRegByThread = config["max_registros_by_conn"];
+
+        for fromIndex in range(0, len(num_marks), maxRegByThread):
+            # tomando desde numeros fromIndex hasta fromIndex+maxRegByThread indices:
+            partNums = num_marks[fromIndex : fromIndex+maxRegByThread]; #slice de numeros
+
+            #elegir un proxy y si esta en la lista de fallados seguir eligiendo siguiente:
+            _firstProxy = nextProxy = next(proxiesCycle);
+            while nextProxy in failedProxies:
+                nextProxy = next(proxiesCycle);
+                if nextProxy == _firstProxy:
+                    print("Posiblemetne todos los proxies tienen fallas.")
+                    break; #<- dio toda la vuelta al ciclo y no encontro sin fallos
+            
+            #lanzar numero limitado de conexiones en hilos a encargarse de la porcion de numeros:
+            self.connThreads.startNewThread(_connectionThreadProxy, partNums, nextProxy);
+            print("-nuevo thread", self.connThreads.count, "threads");
 
 
 
-hostname = open("target_site.txt", "r").read().strip(); #localhost:443
-args = open("regs.txt", "r").read().strip(); #123
+if __name__ == "__main__":
 
+    hostname = open("target_site.txt", "r").read().strip(); #localhost:443
+    args = open("regs.txt", "r").read().strip(); #123
 
-b = Scrap(hostname);
+    b = Scrap(hostname);
 
-print(b.searchByMark( args.splitlines() )); #123
+    print(b.searchByMark( args.splitlines() )); #123
 
-b.close();
-
-
+    b.close();
 
