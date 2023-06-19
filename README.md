@@ -7,7 +7,7 @@ Cumpliendo con un challenge de scraping midd
     Se necesita ejecutar el comando **"pip install requests"**
  * Crear o modificar los archivos .txt que este mini-tutorial readme señala.
  * Configurar con los valores adecuados config.py como este tutorial y los comentarios en el codigo señalan.
-
+ * El ultimo paso ejecutar "scrap.py"
 
 ## Funcionamiento
 Cumple con lo requerido, busca por **numeros de marca** en el sitio y por manejo de threads y proxies logra cumplir con las requests.
