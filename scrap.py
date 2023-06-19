@@ -117,12 +117,21 @@ class Scrap:
                     self.debugErrors("No se ha podido hacer efectivamente el POST.");
                     return -1;
                 resp = json.loads(resp);
-                if not "d" in resp or "ErrorMessage" in resp["d"]:
+
+                if not resp or not "d" in resp:
+                    #in resp or "ErrorMessage" in resp["d"]:
+                    
                     #posiblemente la conexion actual ya no funciona como queremos
-                    self.debugErrors("Error json1", json.loads(resp["d"])["ErrorMessage"]);
+                    self.debugErrors("Error json1", json.loads(resp["d"]));
                     return 0;
-                
-                lastHash = json.loads(resp["d"])["Hash"];
+
+                resp["d"] = json.loads(resp["d"]);
+
+                if not "Marcas" in resp["d"] or not resp["d"]["Marcas"]:
+                    #no existe la busqueda...
+                    continue;
+
+                lastHash = resp["d"]["Hash"];
 
                 #preparamos segunda solicitud:
                 data2 = {"IDW": idw, "Hash": lastHash,
@@ -143,7 +152,7 @@ class Scrap:
                 resp2["d"] = json.loads(resp2["d"]);
 
                 if "ErrorMessage" in resp2["d"]:
-                    print(resp2)
+                    print("resp2 err", resp2)
                     msg = resp2["d"]["ErrorMessage"];
                     if "no existe" in msg:
                         #continuamos, no existe el num, pero contiuamos con los demas
@@ -163,7 +172,7 @@ class Scrap:
                 #print("hash termina en ",lastHash)
 
                 numsCompleteds[num] = self.getResult(resp2);
-                
+
                 progress = len(numsCompleteds) / len(num_marks) * 100.0;
                 print(f"\r {progress:.02f}% {len(numsCompleteds)}:{len(num_marks)} resultados x{self.connThreads.count} proxys-threads.",
                                 end="");
@@ -284,12 +293,15 @@ def main():
         args = fp.read();
         fp.close();
     except:
-        print("Error al leer el archivo target_tegs.txt");
+        print("Error al leer el archivo target_regs.txt");
         return;
     
     #convertimos el archivo cada linea a un numero valido, en una lista:
     argNums = [n.strip() for n in args.strip().splitlines() if n.strip().isdigit()];
     del args;
+    if not argNums:
+        print("Sin numeros en target regs.txt")
+        return;
 
     print(f"Cargados desde target_regs.txt {len(argNums)} numeros. ");
 

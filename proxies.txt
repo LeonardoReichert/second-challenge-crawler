@@ -1,0 +1,6 @@
+#aqui van los proxys:
+#cada linea es ip:port
+#ejemplo:
+#127.0.0.1:8080
+#127.0.0.1:8000
+
