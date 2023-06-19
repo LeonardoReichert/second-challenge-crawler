@@ -3,7 +3,10 @@
 
 __pycache__
 target_site.txt
-regs.txt
+target_regs.txt
 proxies.txt
 
+regs_congrats.txt
+saves
+warnings.log
 

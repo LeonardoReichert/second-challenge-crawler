@@ -11,10 +11,11 @@ import re;
 import json;
 import time;
 import itertools;
-from threading import Thread;
+import os;
 
 #own modules:
 from config import config;
+from proxies import proxies;
 from browser import Browser;
 from pool_threads import PoolThreads;
 
@@ -24,12 +25,22 @@ from pool_threads import PoolThreads;
 class Scrap:
 
     def __init__(self, hostname,
-                 concurrent_proxies = config["proxies"],
+                 concurrent_proxies = proxies,
+                 max_threads = config["max_threads_proxy"],
+                 debugErrors = config["debug_errors_conn"],
+                 maxregistros_peer_conn = config["maxregistros_peer_conn"]
                  ):
 
         self.hostname = hostname;
-        self.connThreads = PoolThreads(len(concurrent_proxies));
+        self.connThreads = PoolThreads(max_threads);
         self.concurrentProxies = concurrent_proxies;
+        self.maxregistros_peer_conn = maxregistros_peer_conn;
+        self._debugErrors = debugErrors;
+
+    
+    def debugErrors(self, *objs, **kwargs):
+        if self._debugErrors:
+            print(*objs, **kwargs);
         
     
     def findFormFirstHashes(self, browser, url):
@@ -46,7 +57,7 @@ class Scrap:
         hasTx = form and "name=\"txtSolicitud\"" in form[0];
 
         if not (hashes and form and hasTx):
-            print("Faltan partes en el form")
+            print("Faltan partes en el form");
             return -1;
 
         hashes = hashes[0];
@@ -55,20 +66,21 @@ class Scrap:
         return hashes;
 
 
-    def searchByMark(self, num_marks):
+    def searchByMark(self, _num_marks):
         """
-        Busca, obtiene mediante Requests y por marcas lo necesario
+        Busca, obtiene mediante Requests y por numeros lo necesario,
+        devuelve un diccionario de claves numero con valores resultado solicitad.
         """
 
         #bien los parametros antes de comenzar:
-        if not type(num_marks) in (list, tuple):
+        if not type(_num_marks) in (list, tuple):
             raise Exception("Error-num_marks is not a tuple or list")
+        
+        #hacemos una copia y exceptuamos los repetidos:
+        num_marks = list(set(_num_marks));
 
-        #guardamos los proxies que fallan:
-        failedProxies = [];
-        numsCompleted = [];
-        result = [];
-
+        #el resultado:
+        numsCompleteds = {};
 
         def _connectionThreadProxy(nmarks, use_proxy):
             """ Conexion, proxy y thread que se encarga de una porcion de numeros solicitados """
@@ -81,8 +93,7 @@ class Scrap:
             #visitamos la pagina, lo primero:
             hashes = self.findFormFirstHashes(browser, url);
             if hashes == -1:
-                print("Fallo la primer visita")
-                failedProxies.append(use_proxy);
+                self.debugErrors("Fallo la primer visita");
                 return -1;
                 
             lastHash, idw = hashes;
@@ -103,69 +114,204 @@ class Scrap:
                 resp = browser.post(url+"/FindMarcas",json=data,
                         headers={"Content-Type":"application/json"});
                 if resp == -1:
-                    print("No se ha podido hacer efectivamente el POST.");
+                    self.debugErrors("No se ha podido hacer efectivamente el POST.");
                     return -1;
                 resp = json.loads(resp);
                 if not "d" in resp or "ErrorMessage" in resp["d"]:
-                    print("Error json1", json.loads(resp["d"])["ErrorMessage"]);
+                    #posiblemente la conexion actual ya no funciona como queremos
+                    self.debugErrors("Error json1", json.loads(resp["d"])["ErrorMessage"]);
                     return 0;
                 
-                lastHash2 = json.loads(resp["d"])["Hash"];
+                lastHash = json.loads(resp["d"])["Hash"];
 
-                #print("resp1",resp)
                 #preparamos segunda solicitud:
-                data2 = {"IDW": idw, "Hash": lastHash2,
+                data2 = {"IDW": idw, "Hash": lastHash,
                             "numeroSolicitud": str(num)};
-
-                print("\n\n")
                 
                 #segunda solicitud, tocar en la lista de resultados:
                 resp2 = browser.post(url+"/FindMarcaByNumeroSolicitud",
                                 json=data2, headers={"Content-Type": "application/json"});
-                
+                if resp2 == -1:
+                    self.debugErrors("No se ha podido hacer efectivamente el POST.");
+                    return -1;
+
                 resp2 = json.loads(resp2);
-                #{'d': '{"ErrorMessage":"Información:\\n\\n Lo sentimos, ha excedido el límite de consultas. Vuelva a intentarlo más tarde."}'}
-                if not "d" in resp2 or "ErrorMessage" in resp2["d"]:
-                    print("Error json2", json.loads(resp2["d"])["ErrorMessage"]);
-                    #posiblemente el proxy dado esta fallando:
-                    failedProxies.append(use_proxy);
-                    return 0;
+                if not "d" in resp2:
+                    #posiblemente esta conexion no funciona bien
+                    return -1;
                 
-                #print("resp2",resp2);
-                print("-resultado");
+                resp2["d"] = json.loads(resp2["d"]);
+
+                if "ErrorMessage" in resp2["d"]:
+                    print(resp2)
+                    msg = resp2["d"]["ErrorMessage"];
+                    if "no existe" in msg:
+                        #continuamos, no existe el num, pero contiuamos con los demas
+                        numsCompleteds[num] = None;
+                        print("no exite el registro");
+                        continue;
+                    elif re.search("excedido el l.mite", msg, flags=re.DOTALL):
+                        #mensaje desde el servidor que se ha caido la solicitud
+                        print("se ha caido la solicitud");
+                        return 0;
+                
+                    print("Error json2", resp2["d"]["ErrorMessage"]);
+                    #posiblemente el proxy dado esta fallando:
+                    return 0;
+            
+                lastHash = resp2["d"]["Hash"];
+                #print("hash termina en ",lastHash)
+
+                numsCompleteds[num] = self.getResult(resp2);
+                
+                progress = len(numsCompleteds) / len(num_marks) * 100.0;
+                print(f"\r {progress:.02f}% {len(numsCompleteds)}:{len(num_marks)} resultados x{self.connThreads.count} proxys-threads.",
+                                end="");
         
         # se usara los proxies de manera ciclica
         # para (a,b,c) tomar a>b>c>a>b>c
         proxiesCycle = itertools.cycle(self.concurrentProxies);
 
-        maxRegByThread = config["max_registros_by_conn"];
+        #mientras los completados sean menos que los solicitados:
+        while len(numsCompleteds) < len(num_marks):
 
-        for fromIndex in range(0, len(num_marks), maxRegByThread):
-            # tomando desde numeros fromIndex hasta fromIndex+maxRegByThread indices:
-            partNums = num_marks[fromIndex : fromIndex+maxRegByThread]; #slice de numeros
+            #tomamos una porcion de numeros entre todos:
+            maxRegByThread = self.maxregistros_peer_conn;
+            for iFrom in range(0, len(num_marks), maxRegByThread):
+                # tomando desde numeros fromIndex hasta fromIndex+maxRegByThread indices:
+                partNums = num_marks[iFrom : iFrom+maxRegByThread]; #<-slice de numeros
+                partNums = [n for n in partNums if not n in numsCompleteds] #<-tomar los no completados
+                if not partNums: #<- si la porcion tomada ya esta terminada me podria quedar vacio
+                    continue;
 
-            #elegir un proxy y si esta en la lista de fallados seguir eligiendo siguiente:
-            _firstProxy = nextProxy = next(proxiesCycle);
-            while nextProxy in failedProxies:
+                #elegir un proxy siguiente:
                 nextProxy = next(proxiesCycle);
-                if nextProxy == _firstProxy:
-                    print("Posiblemetne todos los proxies tienen fallas.")
-                    break; #<- dio toda la vuelta al ciclo y no encontro sin fallos
-            
-            #lanzar numero limitado de conexiones en hilos a encargarse de la porcion de numeros:
-            self.connThreads.startNewThread(_connectionThreadProxy, partNums, nextProxy);
-            print("-nuevo thread", self.connThreads.count, "threads");
+                
+                #lanzar numero limitado de conexiones en hilos a encargarse de la porcion de numeros:
+                self.connThreads.startNewThread(_connectionThreadProxy, partNums, nextProxy);
+                
+            #print(f"\nhay {self.connThreads.count} threads\n");
+        
+        print(f"\nfinalizando {self.connThreads.count} threads...\n");
+        self.connThreads.waitThreads(wait_all=True);
+            #print(len(numsCompleteds), "de", len(num_marks));
+        print("terminados", len(numsCompleteds), "resultados");
+    
+        return numsCompleteds;
 
+
+    def getResult(self, item_json):
+        """ Devuelve lo necesario para cada resultado, segun requisitos """
+
+        try:
+            instancias = item_json["d"]["Marca"]["Instancias"];
+        except KeyError as _msg:
+            #nunca paso
+            open("warnings.log", "a").write("\n"+str(_msg)+"\n"+str(item_json)+"\n");
+
+        result = {"Observada_de_Fondo": False,
+                  "Fecha_Observada_Fondo": None,
+                  "Apelaciones": False,
+                  "IPT": False,
+                   };
+
+        for dictInst in instancias:
+            if dictInst["EstadoDescripcion"] == "Resoluci\u00f3n de observaciones de fondo de marca":
+                result["Observada_de_Fondo"] = True;
+                result["Fecha_Observada_Fondo"] = dictInst["Fecha"];
+                continue;
+            
+            if "Recurso de apelacion" in dictInst["EstadoDescripcion"]:
+                result["Apelaciones"] = True;
+
+            if "IPT" in dictInst["EstadoDescripcion"] or "IPTV" in dictInst["EstadoDescripcion"]:
+                result["IPT"] = True;
+        
+        return result;
+            
+    def saveResult(self, filename, results, encoding=config["encoding"]):
+        
+        try:
+            with open(filename, "w", encoding=encoding, errors="replace") as fp:
+                #fp.write(str(res) + "\n\n");
+                json.dump(results,fp);
+            return True;
+        except Exception as msg:
+            print(f"Error {msg}");
+        
+        return False;
+
+
+def main():
+
+    print(
+        """
+
+    === Iniciado ===
+
+        """
+    );
+
+    if not os.path.exists(config["dir_saves"]):
+        try:
+            os.makedirs(config["dir_saves"]);
+        except Exception as msg:
+            print(f"Error al crear la carpeta de resultados: {msg}");
+            return;
+
+    #############
+
+    if not os.path.exists("target_site.txt"):
+        print("Error: El archivo target_site.txt no existe.");
+        return;
+
+    try:
+        fp = open("target_site.txt", "r");
+        hostname = fp.read().strip(); #localhost:443
+        fp.close();
+    except Exception as msg:
+        print("Error al abrir el archivo target_site.txt");
+        return;
+    
+    ##############
+
+    if not os.path.exists("target_regs.txt"):
+        print("Error: El archivo target_regs.txt no existe.");
+        return;
+
+    try:
+        fp = open("target_regs.txt", "r");
+        args = fp.read();
+        fp.close();
+    except:
+        print("Error al leer el archivo target_tegs.txt");
+        return;
+    
+    #convertimos el archivo cada linea a un numero valido, en una lista:
+    argNums = [n.strip() for n in args.strip().splitlines() if n.strip().isdigit()];
+    del args;
+
+    print(f"Cargados desde target_regs.txt {len(argNums)} numeros. ");
+
+    filenameSave = f"{config['dir_saves']}{config['filename_saves']}";
+
+    #creamos el objeto principal:
+
+    sc = Scrap(hostname);
+
+    results = sc.searchByMark(argNums);
+
+    succes = sc.saveResult(filenameSave, results);
+
+    if succes:
+        print(f"Los {len(results)} se guardaron en {filenameSave} exitosamente");
+    else:
+        print("Los resultados no se guardaron bien.")
+        return;
+
+    return True; #fin
 
 
 if __name__ == "__main__":
-
-    hostname = open("target_site.txt", "r").read().strip(); #localhost:443
-    args = open("regs.txt", "r").read().strip(); #123
-
-    b = Scrap(hostname);
-
-    print(b.searchByMark( args.splitlines() )); #123
-
-    b.close();
+    main();
 
