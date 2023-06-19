@@ -16,16 +16,26 @@ Cada proxy sera un thread que toma una porción del trabajo, se usaran varios pr
 ## Archivos necesarios
  Se debe crear los siguientes archivos en la carpeta del programa:
  * **target_site.txt**: El archivo que contiene la **dirección del sitio** al que apuntar, tal asi: https://localhost (siempre con https://). Este archivo no puede tener otra cosa que el host, no puede tener comentarios o otra cosa.
- * **target_regs.txt**: El archivo con todos los **numeros de marca** a consultar uno debajo del otro, uno por linea, un ejemplo para tres numeros:<br>
-    1111111111111111111<br>
-    2222222222222222222<br>
-    3333333333333333333<br>
- * **proxies.txt**: El archivo que contiene las **proxies** a usarse, una por linea debajo de la otra, por ejemplo:<br>
-ip1:puerto<br>
-ip2:puerto<br>
-ip3:puerto<br>
+ * **target_regs.txt**: El archivo con todos los **numeros de marca** a consultar uno debajo del otro, uno por linea, un ejemplo para tres numeros:
+
+```
+1111111111111111111
+2222222222222222222
+3333333333333333333
+```
+
+ * **proxies.txt**: El archivo que contiene las **proxies** a usarse, una por linea debajo de la otra, por ejemplo:
+
+```
+ip1:puerto
+ip2:puerto
+ip3:puerto
+```
+
 <br>
+
 ## Configuración
+----------------
  El archivo **config.py** tiene las **configuraciones necesarias** para poner a punto y dar una correcta y personalizada ejecución, tiene una variable config **como diccionario** que es el diccionario que agrupa toda la **configuración del programa**. Este mismo archivo esta repleto de comentarios que guian para que sirve cada cosa.
  
  Las **opciones** son:
@@ -58,7 +68,12 @@ ip3:puerto<br>
   * **_proxies_need_prevtest**: True/False para testear opcionalmente los proxies antes de empezar y seguir solo con los que respondan.
   * **_threads_prevtest_proxy**: Cantidad de threads de prueba a usar para testear los proxies.
 
+
+<br>
+
 ## Otras indicaciones y aclaraciones
+-------------------------------------
+
   Por logica, no permite ejecutar el programa sin proxies, se necesita proxies en el archivo **proxies.txt** para poder tener exito.
  De esta manera el programa se basa en crear un **thread a cada conexion proxy**, un thread independiente. El algoritmo usa threads de manera ciclica, crea threads y le asigna una **porcion de numeros**, hace lo mismo para un limite de threads y cuando terminan esos threads mientras hallan mas numeros sigue lanzando de esta manera threads hasta terminar, es como una rueda de threads o conexiones hasta terminar.
 
