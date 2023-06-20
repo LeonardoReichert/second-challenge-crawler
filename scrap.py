@@ -105,6 +105,7 @@ class Scrap:
             count = 0;
             while count < self.maxregistros_peer_conn and (len(numsCompleteds) < len(num_marks)) :
 
+                count += 1;
                 #tomamos siguiente numero del ciclo, si no fue completado:
                 num = next(numbCycle);
                 if num in numsCompleteds:
@@ -338,4 +339,5 @@ def main():
 
 if __name__ == "__main__":
     main();
+    input("Pause")
 
