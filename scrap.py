@@ -66,7 +66,7 @@ class Scrap:
         return hashes;
 
 
-    def searchByMark(self, _num_marks):
+    def searchByMark(self, _num_marks, excludeInvalidNumbers=True):
         """
         Busca, obtiene mediante Requests y por numeros lo necesario,
         devuelve un diccionario de claves numero con valores resultado solicitad.
@@ -78,11 +78,15 @@ class Scrap:
         
         #hacemos una copia y exceptuamos los repetidos:
         num_marks = list(set(_num_marks));
+        repetidos = len(_num_marks) - len(num_marks);
+        if repetidos > 0:
+            print(f"Repetidos: {repetidos}")
 
         #el resultado:
         numsCompleteds = {};
 
-        def _connectionThreadProxy(nmarks, use_proxy):
+
+        def _connectionThreadProxy(use_proxy):
             """ Conexion, proxy y thread que se encarga de una porcion de numeros solicitados """
 
             url = "/Marca/BuscarMarca.aspx";
@@ -98,7 +102,11 @@ class Scrap:
                 
             lastHash, idw = hashes;
 
-            for num in nmarks:
+            for _ in range(self.maxregistros_peer_conn):
+                #tomamos siguiente numero del ciclo, si no fue completado:
+                num = next(numbCycle);
+                if num in numsCompleteds:
+                    continue;
 
                 #esperar un poco por consulta?:
                 if num: time.sleep(config["wait_seconds_by_query"]);
@@ -129,6 +137,7 @@ class Scrap:
 
                 if not "Marcas" in resp["d"] or not resp["d"]["Marcas"]:
                     #no existe la busqueda...
+                    numsCompleteds[num] = None;
                     continue;
 
                 lastHash = resp["d"]["Hash"];
@@ -152,19 +161,19 @@ class Scrap:
                 resp2["d"] = json.loads(resp2["d"]);
 
                 if "ErrorMessage" in resp2["d"]:
-                    print("resp2 err", resp2)
+                    #print("resp2 err", resp2)
                     msg = resp2["d"]["ErrorMessage"];
                     if "no existe" in msg:
                         #continuamos, no existe el num, pero contiuamos con los demas
                         numsCompleteds[num] = None;
-                        print("no exite el registro");
+                        #print("no exite el registro");
                         continue;
                     elif re.search("excedido el l.mite", msg, flags=re.DOTALL):
                         #mensaje desde el servidor que se ha caido la solicitud
-                        print("se ha caido la solicitud");
+                        #print("se ha caido la solicitud en una conexion");
                         return 0;
-                
-                    print("Error json2", resp2["d"]["ErrorMessage"]);
+
+                    #print("Error json2", resp2["d"]["ErrorMessage"]);
                     #posiblemente el proxy dado esta fallando:
                     return 0;
             
@@ -180,32 +189,33 @@ class Scrap:
         # se usara los proxies de manera ciclica
         # para (a,b,c) tomar a>b>c>a>b>c
         proxiesCycle = itertools.cycle(self.concurrentProxies);
+        numbCycle = itertools.cycle(num_marks);
 
         #mientras los completados sean menos que los solicitados:
         while len(numsCompleteds) < len(num_marks):
-
-            #tomamos una porcion de numeros entre todos:
-            maxRegByThread = self.maxregistros_peer_conn;
-            for iFrom in range(0, len(num_marks), maxRegByThread):
-                # tomando desde numeros fromIndex hasta fromIndex+maxRegByThread indices:
-                partNums = num_marks[iFrom : iFrom+maxRegByThread]; #<-slice de numeros
-                partNums = [n for n in partNums if not n in numsCompleteds] #<-tomar los no completados
-                if not partNums: #<- si la porcion tomada ya esta terminada me podria quedar vacio
-                    continue;
-
-                #elegir un proxy siguiente:
-                nextProxy = next(proxiesCycle);
+            
+            #elegir un proxy siguiente:
+            nextProxy = next(proxiesCycle);
                 
-                #lanzar numero limitado de conexiones en hilos a encargarse de la porcion de numeros:
-                self.connThreads.startNewThread(_connectionThreadProxy, partNums, nextProxy);
+            #lanzar numero limitado de conexiones en hilos a encargarse de la porcion de numeros:
+            self.connThreads.startNewThread(_connectionThreadProxy, nextProxy);
                 
             #print(f"\nhay {self.connThreads.count} threads\n");
         
         print(f"\nfinalizando {self.connThreads.count} threads...\n");
         self.connThreads.waitThreads(wait_all=True);
-            #print(len(numsCompleteds), "de", len(num_marks));
         print("terminados", len(numsCompleteds), "resultados");
-    
+
+        if excludeInvalidNumbers:
+            countNunInvalids = 0;
+            for num in list(numsCompleteds.keys()):
+                if numsCompleteds[num] == None:
+                    del numsCompleteds[num]; #remove invalid number
+                    countNunInvalids += 1;
+            
+            if countNunInvalids:
+                print(f"{countNunInvalids} invalidos. Resultado: {len(numsCompleteds)} validos.")
+        
         return numsCompleteds;
 
 

@@ -72,6 +72,6 @@ ip3:puerto
 ## Otras indicaciones y aclaraciones
 
   Por logica, no permite ejecutar el programa sin proxies, se necesita proxies en el archivo **proxies.txt** para poder tener exito.
- De esta manera el programa se basa en crear un **thread a cada conexion proxy**, un thread independiente. El algoritmo usa threads de manera ciclica, crea threads y le asigna una **porcion de numeros**, hace lo mismo para un limite de threads y cuando terminan esos threads mientras hallan mas numeros sigue lanzando de esta manera threads hasta terminar, es como una rueda de threads o conexiones hasta terminar.
+ De esta manera el programa se basa en crear un **thread a cada conexion proxy**, un thread independiente. El algoritmo usa threads de manera ciclica, crea threads y cada thread toma toma numero por turno, hace lo mismo para un limite de threads y cuando terminan esos threads mientras hallan mas numeros sin terminar sigue lanzando de esta manera threads hasta terminar, es como una rueda de threads o conexiones hasta terminar.
 
 Gracias :D
