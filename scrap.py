@@ -104,15 +104,17 @@ class Scrap:
 
             count = 0;
             while count < self.maxregistros_peer_conn and (len(numsCompleteds) < len(num_marks)) :
-
-                count += 1;
+                
                 #tomamos siguiente numero del ciclo, si no fue completado:
                 num = next(numbCycle);
                 if num in numsCompleteds:
                     continue;
 
+                count += 1;
+
                 #esperar un poco por consulta?:
-                if num: time.sleep(config["wait_seconds_by_query"]);
+                if config["wait_seconds_by_query"]:
+                    time.sleep(config["wait_seconds_by_query"]);
                 
                 #preparar 1ra solicitud:
                 data = {"LastNumSol":0,
