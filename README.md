@@ -15,7 +15,7 @@ Cada proxy sera un thread que toma una porción del trabajo, se usaran varios pr
 
 ## Archivos necesarios
  Se debe crear los siguientes archivos en la carpeta del programa:
- * **target_site.txt**: El archivo que contiene la **dirección del sitio** al que apuntar, tal asi: https://localhost (siempre con https://). Este archivo no puede tener otra cosa que el host, no puede tener comentarios o otra cosa.
+ * **target_site.txt**: El archivo que contiene la **dirección del sitio** al que apuntar, tal asi: https://localhost por ejemplo (siempre con https://). Este archivo no puede tener otra cosa que el host, no puede tener comentarios o otra cosa.
  * **target_regs.txt**: El archivo con todos los **numeros de marca** a consultar uno debajo del otro, uno por linea, un ejemplo para tres numeros:
 
 ```
@@ -35,17 +35,15 @@ ip3:puerto
 <br>
 
 ## Configuración
-----------------
  El archivo **config.py** tiene las **configuraciones necesarias** para poner a punto y dar una correcta y personalizada ejecución, tiene una variable config **como diccionario** que es el diccionario que agrupa toda la **configuración del programa**. Este mismo archivo esta repleto de comentarios que guian para que sirve cada cosa.
  
  Las **opciones** son:
-
 
   * **user_agent**: Una cadena de texto, Nombre de usuario agente que se usara.
     
   * **timeouts**: Tiempo o lapso que se espera por cada solicitud, un entero o None.
 
-  * **max_threads_proxy**: Numero de proxies o conexiones en paralelo a la vez mediante threads
+  * **max_threads_proxy**: Numero de proxies o conexiones en paralelo a la vez mediante threads.
 
   * **maxregistros_peer_conn**: Un entero **cantidad de numeros** a consultarse por conexion, o la **porción de numeros** que tomará cada hilo para consultar.
     
@@ -55,7 +53,7 @@ ip3:puerto
 
   * **retry_wait_seconds**: Segundos a esperar despues de un reintento o intento fallido.
     
-  * **read_robots**: Decidir si leer robots.txt o no True/False:
+  * **read_robots**: Decidir si leer robots.txt o no True/False, por defecto es True.
 
   * **debug_errors_conn**: Muestra los errores al no poder acceder a una url mediante (suele ser molesto).
     
@@ -72,7 +70,6 @@ ip3:puerto
 <br>
 
 ## Otras indicaciones y aclaraciones
--------------------------------------
 
   Por logica, no permite ejecutar el programa sin proxies, se necesita proxies en el archivo **proxies.txt** para poder tener exito.
  De esta manera el programa se basa en crear un **thread a cada conexion proxy**, un thread independiente. El algoritmo usa threads de manera ciclica, crea threads y le asigna una **porcion de numeros**, hace lo mismo para un limite de threads y cuando terminan esos threads mientras hallan mas numeros sigue lanzando de esta manera threads hasta terminar, es como una rueda de threads o conexiones hasta terminar.
