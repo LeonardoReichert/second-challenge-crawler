@@ -102,7 +102,9 @@ class Scrap:
                 
             lastHash, idw = hashes;
 
-            for _ in range(self.maxregistros_peer_conn):
+            count = 0;
+            while count < self.maxregistros_peer_conn and (len(numsCompleteds) < len(num_marks)) :
+
                 #tomamos siguiente numero del ciclo, si no fue completado:
                 num = next(numbCycle);
                 if num in numsCompleteds:
