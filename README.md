@@ -5,13 +5,14 @@ Cumpliendo con un challenge de scraping midd
  * Usado **Python** 3.11 aunque podria andar en otras versiones 3.x
  * Usado **requests** como libreria para web.
     Se necesita ejecutar el comando **"pip install requests"**
- * Crear o modificar los archivos .txt que este mini-tutorial readme señala.
+ * Crear o modificar los archivos .txt que este mini-tutorial señala.
  * Configurar con los valores adecuados config.py como este tutorial y los comentarios en el codigo señalan.
  * El ultimo paso ejecutar "scrap.py"
 
 ## Funcionamiento
-Cumple con lo requerido, busca por **numeros de marca** en el sitio y por manejo de threads y proxies logra cumplir con las requests.
-Cada proxy sera un thread que toma una porción del trabajo, se usaran varios proxies-threads hasta completar el trabajo, finalmente se guarda el resultado requerido en un archivo .json como el challenge lo propuso.
+Cumple con lo requerido, busca por **numeros de marca** en el sitio y por manejo de threads y proxies logra cumplir con las requests.<br>
+Lanza la cantidad de Threads especificada por config.py, y cada Thread continuamente establece una nueva la conexion inicial, y luego toma del monton un numero siguiente para consultarlo.<br>
+Los threads tienen vida indeterminada o mejor dicho hasta completar el trabajo total, finalmente se guardan los resultados requeridos en un archivo .json como el challenge.
 
 ## Archivos necesarios
  Se debe crear los siguientes archivos en la carpeta del programa:
@@ -35,7 +36,7 @@ ip3:puerto
 <br>
 
 ## Configuración
- El archivo **config.py** tiene las **configuraciones necesarias** para poner a punto y dar una correcta y personalizada ejecución, tiene una variable config **como diccionario** que es el diccionario que agrupa toda la **configuración del programa**. Este mismo archivo esta repleto de comentarios que guian para que sirve cada cosa.
+ El archivo **config.py** tiene las **configuraciones necesarias** para poner a punto y dar una correcta y personalizada ejecución, tiene solo una variable **config (diccionario)** el cual agrupa toda la **configuracion del programa**. Este mismo archivo esta repleto de comentarios que guian para que sirve cada cosa.
  
  Las **opciones** son:
 
@@ -43,17 +44,14 @@ ip3:puerto
     
   * **timeouts**: Tiempo o lapso que se espera por cada solicitud, un entero o None.
 
-  * **max_threads_proxy**: Numero de proxies o conexiones en paralelo a la vez mediante threads.
-
-  * **maxregistros_peer_conn**: Un entero **cantidad de numeros** a consultarse por conexion, o la **porción de numeros** que tomará cada hilo para consultar.
+  * **max_threads_connections**: Numero de threads o conexiones proxies en paralelo a la vez.
+  Obviamente este numero debe ser menor a la cantidad de proxies existente, si se ingresa mayor a la cantidad de proxies entonces se iguala a la cantidad de proxies...
     
   * **wait_seconds_by_query**: Numero de segundos a esperar por cada consulta en una conexion
 
   * **max_retrys**: Numero de veces que reintentamos acceder a una solicitud.
 
   * **retry_wait_seconds**: Segundos a esperar despues de un reintento o intento fallido.
-    
-  * **read_robots**: Decidir si leer robots.txt o no True/False, por defecto es True.
 
   * **debug_errors_conn**: Muestra los errores al no poder acceder a una url mediante (suele ser molesto).
     
@@ -72,6 +70,6 @@ ip3:puerto
 ## Otras indicaciones y aclaraciones
 
   Por logica, no permite ejecutar el programa sin proxies, se necesita proxies en el archivo **proxies.txt** para poder tener exito.
- De esta manera el programa se basa en crear un **thread a cada conexion proxy**, un thread independiente. El algoritmo usa threads de manera ciclica, crea threads y cada thread toma toma numero por turno, hace lo mismo para un limite de threads y cuando terminan esos threads mientras hallan mas numeros sin terminar sigue lanzando de esta manera threads hasta terminar, es como una rueda de threads o conexiones hasta terminar.
-
+ De esta manera el programa se basa en crear los **threads** y que cada thread se encargue de seleccionar proxies para crear una conexion y cada conexion se encarga de los numeros que pueda, asi se repite hasta terminar la cantidad de numeros ingresados en **target_regs.txt**
+ 
 Gracias :D

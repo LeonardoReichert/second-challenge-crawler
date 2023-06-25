@@ -11,13 +11,11 @@ config = {
     "user_agent": "",
 
     #tiempo de espera por solicitud:
-    "timeouts": None,
+    "timeouts": 10,
 
     #N proxies conexiones en paralelo a la vez:
-    "max_threads_proxy": 5,
+    "max_threads_connections": 3, #renombrar de proxy a connections
 
-    #cantidad de n-registros limite a consultarse por conexion:
-    "maxregistros_peer_conn": 8,
     #numero de segundos a esperar por consulta en una conexion:
     "wait_seconds_by_query": 3,
 
@@ -25,9 +23,6 @@ config = {
     "max_retrys": 3,
     #segundos a esperar despues de un reintento:
     "retry_wait_seconds": 3,
-
-    #decidir si leer robots.txt o no True/False:
-    "read_robots": True,
 
     #muestra los errores al no poder acceder a una url (suele ser molesto)
     "debug_errors_conn": False,
@@ -37,12 +32,11 @@ config = {
 
     #carpeta donde se guardaran los archivos de resultados:
     "dir_saves": "saves/",
-    #nombre de archivo:
+    #nombre de archivo de resultados:
     "filename_saves": "result.json",
 
     #para testear opcionalmente los proxies antes de empezar:
     "_proxies_need_prevtest": False,
-    "_threads_prevtest_proxy": 10,  #threads a usar para testear los proxies
 }
 
 
