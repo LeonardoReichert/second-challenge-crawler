@@ -2,12 +2,12 @@
 Cumpliendo con un challenge de scraping midd
 
 ## Requisitos:
- * Usado **Python** 3.11, es reconocido que la version debe ser mayor a 3.8
+ * Usado **Python** 3.11, es reconocido que la version debe ser mas de a 3.8
  * Usado **requests** como libreria para web.
     Se necesita ejecutar el comando **"pip install requests"**
- * Crear o modificar los archivos .txt que este mini-tutorial señala.
+ * Crear o modificar los archivos *.txt que este mini-tutorial señala.
  * Configurar con los valores adecuados config.py como este tutorial y los comentarios en el codigo señalan.
- * El ultimo paso ejecutar "scrap.py"
+ * El ultimo paso ejecutar el archivo **"\___init_\__.py"**
 
 ## Funcionamiento
 Cumple con lo requerido, busca por **numeros de marca** en el sitio y por manejo de threads y proxies logra cumplir con las requests.<br>
@@ -45,7 +45,7 @@ ip3:puerto
   * **timeouts**: Tiempo o lapso que se espera por cada solicitud, un entero o None.
 
   * **max_threads_connections**: Numero de threads o conexiones proxies en paralelo a la vez.
-  Obviamente este numero no debe ser mayor a la cantidad de proxies existente, si se ingresa mayor a la cantidad de proxies entonces se usa a la cantidad de proxies para este valor...
+  Obviamente este numero no debe ser mayor a la cantidad de proxies a usar, si se ingresa mayor a la cantidad de proxies entonces se usa a la cantidad de proxies para este valor...
     
   * **wait_seconds_by_query**: Numero de segundos a esperar por cada consulta en una conexion
 
@@ -53,7 +53,7 @@ ip3:puerto
 
   * **retry_wait_seconds**: Segundos a esperar despues de un reintento o intento fallido.
 
-  * **debug_errors_conn**: Muestra los errores al no poder acceder a una url mediante (suele ser molesto).
+  * **debug_errors_conn**: True/False para mostrar los errores al no poder acceder a una url mediante (suele ser molesto).
     
   * **encoding**: Codificacion con la que se decodifcicaran y codificaran, por ejemplo cuando se guarda un archivo de resultado se elige el encoding, por defecto "utf-8"
 
