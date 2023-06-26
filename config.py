@@ -31,7 +31,7 @@ config = {
     #segundos a esperar despues de un reintento:
     "retry_wait_seconds": 3,
 
-    #muestra los errores al no poder acceder a una url (suele ser molesto)
+    #debug de los errores al no poder acceder a una url (suele ser molesto)
     "debug_errors_conn": False,
     
     #codificacion con la que se decodifcicaran y codificaran

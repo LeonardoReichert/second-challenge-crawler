@@ -53,7 +53,7 @@ ip3:puerto
 
   * **retry_wait_seconds**: Segundos a esperar despues de un reintento o intento fallido.
 
-  * **debug_errors_conn**: True/False para mostrar los errores al no poder acceder a una url (suele ser molesto).
+  * **debug_errors_conn**: True/False para debug de los errores al no poder acceder a una url (porque suele ser mucho en los logs).
     
   * **encoding**: Codificacion con la que se decodifcicaran y codificaran, por ejemplo cuando se guarda un archivo de resultado se elige el encoding, por defecto "utf-8"
 
