@@ -11,8 +11,8 @@ Cumpliendo con un challenge de scraping midd
 
 ## Funcionamiento
 Cumple con lo requerido, busca por **numeros de marca** en el sitio y por manejo de threads y proxies logra cumplir con las requests.<br>
-Lanza la cantidad de Threads especificada por config.py, y cada Thread continuamente establece una nueva conexion, y luego toma de a un numero de los siguientes para consultarlos.<br>
-Los threads tienen vida indeterminada o mejor dicho hasta completar el trabajo total, finalmente se guardan los resultados requeridos en un archivo .json como el challenge.
+Lanza la cantidad de Threads especificada por config.py, cada Thread continuamente mantineue una conexion, y luego toma de a un numero de los siguientes para consultarlos.<br>
+Asi, los threads tienen vida indeterminada o mejor dicho hasta completar el trabajo total, finalmente se guardan los resultados requeridos en un archivo .json como el challenge.
 
 ## Archivos necesarios
  Se debe crear los siguientes archivos en la carpeta del programa:
@@ -53,7 +53,7 @@ ip3:puerto
 
   * **retry_wait_seconds**: Segundos a esperar despues de un reintento o intento fallido.
 
-  * **debug_errors_conn**: True/False para mostrar los errores al no poder acceder a una url mediante (suele ser molesto).
+  * **debug_errors_conn**: True/False para mostrar los errores al no poder acceder a una url (suele ser molesto).
     
   * **encoding**: Codificacion con la que se decodifcicaran y codificaran, por ejemplo cuando se guarda un archivo de resultado se elige el encoding, por defecto "utf-8"
 
