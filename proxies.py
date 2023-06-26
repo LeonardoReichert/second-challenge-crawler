@@ -37,6 +37,7 @@ class ProxyTester:
         self.max_threads = max_threads
         self.max_retrys = max_retrys
 
+
     def filter_by_test(self):
         """ inicia un test para cada proxy y devuelve 
             una lista de proxies que pasaron el test
@@ -65,15 +66,15 @@ class ProxyTester:
         bw.headers["User-Agent"] = self.user_agent
         bw.proxies = proxy_address
 
-        try:
-            resp = bw.get(self.url_test, timeout=self.timeout)
-            resp.raise_for_status()
-            #success
-            self._results.append(proxy_address)
-            return
-        except:
-            pass
-
+        for _try in range(self.max_retrys+1):
+            try:
+                resp = bw.get(self.url_test, timeout=self.timeout)
+                resp.raise_for_status()
+                #success
+                self._results.append(proxy_address)
+                return
+            except:
+                pass
 
 
 
@@ -81,12 +82,16 @@ class ProxyTester:
 #las proxies se someteran a prueba si se establece la opcion de hacerlo:
 if config["_proxies_need_prevtest"]:
 
+    retrys = config["max_retrys"]
+    if config["_proxies_prevtest_islazy"]:
+        retrys = 0
+
     proxies = ProxyTester(proxies, max_threads = config["max_threads_connections"],
                                    user_agent = config["user_agent"],
                                    url_test = open("target_site.txt", "r").read(),
                                    #timeout=config["timeouts"],
                                    timeout = 10,
-                                   max_retrys = config["max_retrys"],
+                                   max_retrys = retrys,
                         ).filter_by_test()
     
 

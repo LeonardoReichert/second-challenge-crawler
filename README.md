@@ -2,7 +2,7 @@
 Cumpliendo con un challenge de scraping midd
 
 ## Requisitos:
- * Usado **Python** 3.11 aunque podria andar en otras versiones 3.x
+ * Usado **Python** 3.11, es reconocido que la version debe ser mayor a 3.8
  * Usado **requests** como libreria para web.
     Se necesita ejecutar el comando **"pip install requests"**
  * Crear o modificar los archivos .txt que este mini-tutorial señala.
@@ -11,7 +11,7 @@ Cumpliendo con un challenge de scraping midd
 
 ## Funcionamiento
 Cumple con lo requerido, busca por **numeros de marca** en el sitio y por manejo de threads y proxies logra cumplir con las requests.<br>
-Lanza la cantidad de Threads especificada por config.py, y cada Thread continuamente establece una nueva la conexion inicial, y luego toma del monton un numero siguiente para consultarlo.<br>
+Lanza la cantidad de Threads especificada por config.py, y cada Thread continuamente establece una nueva conexion, y luego toma de a un numero de los siguientes para consultarlos.<br>
 Los threads tienen vida indeterminada o mejor dicho hasta completar el trabajo total, finalmente se guardan los resultados requeridos en un archivo .json como el challenge.
 
 ## Archivos necesarios
@@ -45,7 +45,7 @@ ip3:puerto
   * **timeouts**: Tiempo o lapso que se espera por cada solicitud, un entero o None.
 
   * **max_threads_connections**: Numero de threads o conexiones proxies en paralelo a la vez.
-  Obviamente este numero debe ser menor a la cantidad de proxies existente, si se ingresa mayor a la cantidad de proxies entonces se iguala a la cantidad de proxies...
+  Obviamente este numero no debe ser mayor a la cantidad de proxies existente, si se ingresa mayor a la cantidad de proxies entonces se usa a la cantidad de proxies para este valor...
     
   * **wait_seconds_by_query**: Numero de segundos a esperar por cada consulta en una conexion
 
@@ -62,7 +62,10 @@ ip3:puerto
   * **filename_saves**: Nombre del archivo de resultados por defecto "result.json"
     <br>
   * **_proxies_need_prevtest**: True/False para testear opcionalmente los proxies antes de empezar y seguir solo con los que respondan.
-  * **_threads_prevtest_proxy**: Cantidad de threads de prueba a usar para testear los proxies.
+
+  * **_proxies_prevtest_islazy**: True/False para indicar que si se inicia un testeo previo de proxies
+  se usara de **manera vaga (sin reintentos)** o con los reintentos especificados por **max_retrys**.
+  El testeo con reintentos tarda mas tiempo.
 
 
 <br>
@@ -70,6 +73,5 @@ ip3:puerto
 ## Otras indicaciones y aclaraciones
 
   Por logica, no permite ejecutar el programa sin proxies, se necesita proxies en el archivo **proxies.txt** para poder tener exito.
- De esta manera el programa se basa en crear los **threads** y que cada thread se encargue de seleccionar proxies para crear una conexion y cada conexion se encarga de los numeros que pueda, asi se repite hasta terminar la cantidad de numeros ingresados en **target_regs.txt**
- 
+
 Gracias :D

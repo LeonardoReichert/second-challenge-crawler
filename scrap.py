@@ -11,9 +11,11 @@ import re
 import json
 import time
 import itertools
-import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+import logging
+
+
 
 #own modules:
 from config import config
@@ -24,20 +26,32 @@ from browser import Browser
 
 
 class Scrap:
-
+    """
+        Clase donde se implementa la idea principal
+        Ejemplo:
+        >>> s = Scrap(hostname)
+        >>> result = s.search_nmarks(numbers)
+        >>> s.save_result("result.json", result)
+    """
     def __init__(self, hostname,
-                 concurrent_proxies = proxies,
-                 max_threads = config["max_threads_connections"],
-                 debug_errors = config["debug_errors_conn"],
-                 ):
+                        concurrent_proxies = proxies.copy(),
+                        max_threads = config["max_threads_connections"],
+                        debug_conn_errors = config["debug_errors_conn"],
+                        ):
+        
+        if len(concurrent_proxies) == 0:
+            # no se especificaron proxies..
+            logging.error("Sin proxies el programa no puede correr, configurar proxies.txt")
+            raise Exception("program need proxies")
         
         if max_threads > len(concurrent_proxies):
-            # si los proxies son menos, se usaran menos threads, por obviedad
+            # si los proxies son menos, se usaran menos threads
             max_threads = len(concurrent_proxies)
+            logging.warning("Configuracion de threads totales es superior a los proxies, se usaran menos")
 
         self.hostname = hostname
         self.concurrent_proxies = concurrent_proxies
-        self._debug_errors = debug_errors
+        self._debug_conn_errors = debug_conn_errors
         self.max_threads = max_threads
 
         self.lock_debug = Lock()
@@ -51,13 +65,16 @@ class Scrap:
             print(f"\r {progress:.02f}% {len(completeds)}:{len(allnumbers)} progreso completado...", end="")
 
 
-    def debug_errors(self, *objs, **kwargs):
-        #aun me falta mejorar esta funcionalidad con logs
-        if self._debug_errors:
-            print(*objs, **kwargs)
-        
+    def debug_conn_errors(self, message):
+        """ Se encarga de los logs de errores de conexion molestos """
+        if self._debug_conn_errors:
+            # solo si se desea se captar estos errores
+            with self.lock_debug:
+                # - sincronizado -
+                logging.error(message)
+
     
-    def find_form_first_hashes(self, browser, sub_url):
+    def _find_form_first_hashes(self, browser, sub_url):
         """ Primer paso, visitar link, obtener primeros hashes """
         
         html = browser.get(sub_url)
@@ -72,7 +89,7 @@ class Scrap:
 
         if not (hashes and form and have_txt):
             # esto no paso nunca
-            print("Faltan partes en el form")
+            logging.warning("Faltan partes en el form")
             return -1
 
         hashes = hashes[0]
@@ -83,8 +100,12 @@ class Scrap:
 
     def search_nmarks(self, num_marks, exclude_invalid_numbers=True):
         """
-        Busca, obtiene mediante Requests y por numeros lo necesario,
+         Busca, obtiene mediante Requests y por numeros lo necesario,
         devuelve un diccionario de claves numero con valores resultado solicitad.
+        Parametros:
+            - num_marks: lista de numeros.
+            - exclude_invalid_numbers: boleano, excluir del resultado los
+                                        numeros que no existan.
         """
 
         #bien los parametros antes de comenzar:
@@ -103,9 +124,9 @@ class Scrap:
 
 
         def task_thread_connections():
-            """ threads que se encargan por medio de conexiones y proxies, de los numeros.
-                Varias veces elige un nuevo proxy, y una porcion de numeros para ese proxy,
-                para cada numero intenta un resultado.
+            """ Threads que se encargan por medio de conexiones y proxies, de los numeros.
+                Continuamente: elige un nuevo proxy y establece una conexion, y para esa
+                conexion elige numeros, para cada numero intenta un resultado.
             """
 
             sub_url = "/Marca/BuscarMarca.aspx"
@@ -117,13 +138,14 @@ class Scrap:
                     # - sincronizado -
                     use_proxy = next(proxies_cycle)
 
-                #conexion con o sin proxy, independiente del resto:
+                #browser con proxy:
                 browser = Browser(self.hostname, use_proxy)
+
                 #visitamos la pagina, lo primero:
-                hashes = self.find_form_first_hashes(browser, sub_url)
+                hashes = self._find_form_first_hashes(browser, sub_url)
 
                 if hashes == -1:
-                    self.debug_errors("Fallo la primer visita")
+                    #fallo la primera visita, siguiente proxy:
                     continue
                     
                 last_hash, idw = hashes
@@ -148,20 +170,21 @@ class Scrap:
                     data = {"LastNumSol":0,
                             "Hash":last_hash, "IDW":idw, "responseCaptcha":"",
                             "param1":num,"param17":"1"}
-                    #llenamos de datos iguales:
+                    #lo llenamos de datos iguales:
                     data |= {f"param{n}":"" for n in range(2,17)}
                     
-                    #enviar numero:
+                    #consultar numero:
                     resp = browser.post(sub_url+"/FindMarcas",json=data,
                             headers={"Content-Type":"application/json"})
                     if resp == -1:
-                        self.debug_errors("No se ha podido hacer efectivamente el POST.")
-                        break #<- siguiente conexion
+                        self.debug_conn_errors(f"No se ha podido hacer el 1er POST.")
+                        #siguiente conexion:
+                        break
                     resp = json.loads(resp)
 
                     if not resp or not "d" in resp:
                         #posiblemente la conexion actual ya no funciona como queremos
-                        self.debug_errors("Error json1", json.loads(resp["d"]))
+                        self.debug_conn_errors(f"Error json de numero {num}, no hay clave 'd' en json")
                         #siguiente conexion:
                         break
 
@@ -184,7 +207,7 @@ class Scrap:
                     resp2 = browser.post(sub_url+"/FindMarcaByNumeroSolicitud",
                                     json=data2, headers={"Content-Type": "application/json"})
                     if resp2 == -1:
-                        self.debug_errors("No se ha podido hacer efectivamente el POST.")
+                        self.debug_conn_errors("No ha podido hacer efectivamente el 2do POST.")
                         #siguiente conexion:
                         break
 
@@ -196,7 +219,6 @@ class Scrap:
                     resp2["d"] = json.loads(resp2["d"])
 
                     if "ErrorMessage" in resp2["d"]:
-                        #print("resp2 err", resp2)
                         msg = resp2["d"]["ErrorMessage"]
                         if "no existe" in msg:
                             #continuamos, no existe el num:
@@ -240,8 +262,8 @@ class Scrap:
 
         #esperar todos los threads:
         pool_threads.shutdown()
-        
-        print("\nterminados", len(completeds), "resultados.")
+
+        print("terminados", len(completeds), "resultados.")
 
         #quitamos los invalidos, si es necesario:
         if exclude_invalid_numbers:
@@ -263,9 +285,9 @@ class Scrap:
 
         try:
             instancias = item_json["d"]["Marca"]["Instancias"]
-        except KeyError as _msg:
+        except KeyError:
             #nunca paso
-            open("warnings.log", "a").write("\n"+str(_msg)+"\n"+str(item_json)+"\n")
+            logging.warning(f'error de tipo KeyError en json "{item_json}"')
 
         result = {"Observada_de_Fondo": False,
                   "Fecha_Observada_Fondo": None,
@@ -288,92 +310,14 @@ class Scrap:
         return result
             
     def save_result(self, filename, results, encoding=config["encoding"]):
-        
+        """ Guarda el resultado de la busqueda en un archivo .json """
+
         try:
             with open(filename, "w", encoding=encoding, errors="replace") as fp:
-                #fp.write(str(res) + "\n\n")
                 json.dump(results,fp)
             return True
         except Exception as msg:
-            print(f"Error {msg}")
+            logging.error(f"No se ha podido guardar {filename}, mensaje: {msg}")
         
         return False
-
-
-def main():
-
-    print(
-        """
-
-    === Iniciado ===
-
-        """
-    )
-
-    if not os.path.exists(config["dir_saves"]):
-        try:
-            os.makedirs(config["dir_saves"])
-        except Exception as msg:
-            print(f"Error al crear la carpeta de resultados: {msg}")
-            return
-
-    #############
-
-    if not os.path.exists("target_site.txt"):
-        print("Error: El archivo target_site.txt no existe.")
-        return
-
-    try:
-        fp = open("target_site.txt", "r")
-        hostname = fp.read().strip() #localhost:443
-        fp.close()
-    except Exception as msg:
-        print("Error al abrir el archivo target_site.txt")
-        return
-    
-    ##############
-
-    if not os.path.exists("target_regs.txt"):
-        print("Error: El archivo target_regs.txt no existe.")
-        return
-
-    try:
-        fp = open("target_regs.txt", "r")
-        args = fp.read()
-        fp.close()
-    except:
-        print("Error al leer el archivo target_regs.txt")
-        return
-    
-    #convertimos el archivo cada linea a un numero valido, en una lista:
-    arg_nums = [n.strip() for n in args.strip().splitlines() if n.strip().isdigit()]
-    del args
-    if not arg_nums:
-        print("Sin numeros en target regs.txt")
-        return
-
-    print(f"Cargados desde target_regs.txt {len(arg_nums)} numeros. ")
-
-    filename_save = f"{config['dir_saves']}{config['filename_saves']}"
-
-    #creamos el objeto principal:
-
-    sc = Scrap(hostname)
-    
-    results = sc.search_nmarks(arg_nums)
-
-    succes = sc.save_result(filename_save, results)
-
-    if succes:
-        print(f"Los {len(results)} se guardaron en {filename_save} exitosamente")
-    else:
-        print("Los resultados no se guardaron bien.")
-        return
-
-    return True #fin
-
-
-if __name__ == "__main__":
-    main()
-    input("Pause")
 

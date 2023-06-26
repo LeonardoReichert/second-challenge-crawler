@@ -7,9 +7,13 @@ Aqui la construccion del cuerpo del browser
 
 
 from requests import Session
+from threading import Lock
 import time
+import logging
 
 from config import config
+
+
 
 
 class Browser(Session):
@@ -23,15 +27,22 @@ class Browser(Session):
         self.proxies = proxy
         self._debug_errors = debug_errors
 
-    def debug_errors(self, *obj, **kwargs):
+        self.lock_debug = Lock()
+
+
+    def debug_errors(self, message):
+        """ Se encarga de los logs de errores de conexion molestos """
         if self._debug_errors:
-            print(*obj, **kwargs)
+            # solo si se desea se captar estos errores
+            with self.lock_debug:
+                # - sincronizado -
+                logging.error(message)
             
             
-    def post(self, url, **kwargs):
+    def post(self, suburl, **kwargs):
         """ POST con reintentos a la sub url, por ejemplo /index.html"""
 
-        url = self.hostname + url
+        url = self.hostname + suburl
     
         for _retry in range(config["max_retrys"]+1):
             try:
@@ -40,7 +51,7 @@ class Browser(Session):
                 resp.raise_for_status()
                 return resp.content.decode(config["encoding"])
             except Exception as msg:
-                self.debug_errors(f"url {url} fallo, esperando segundos.. {msg}")
+                self.debug_errors(f"url {suburl} fallo en metodo POST {msg}")
                 time.sleep(config["retry_wait_seconds"]) 
                
         return -1
@@ -56,7 +67,7 @@ class Browser(Session):
                 resp.raise_for_status()
                 return resp.content.decode(config["encoding"])
             except Exception as msg:
-                self.debug_errors(f"url {suburl} fail, waitin seconds..", str(msg))
+                self.debug_errors(f"url {suburl} fallo en metodo GET {msg}")
                 time.sleep(config["retry_wait_seconds"])
         
         return -1
